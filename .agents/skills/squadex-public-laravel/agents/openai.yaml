@@ -1,0 +1,4 @@
+interface:
+  display_name: "SQUADEX Public Laravel"
+  short_description: "Maintain the public Blade and projection-reading application"
+  default_prompt: "Build or change the SQUADEX public Laravel application while preserving its read-only boundary from FastAPI."

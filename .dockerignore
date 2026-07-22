@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+.fleet
+.env
+.env.*
+!.env.example
+!.env.testing
+node_modules
+vendor
+public/build
+bootstrap/cache/*.php
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*

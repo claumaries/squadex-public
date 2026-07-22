@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1.7
+FROM php:8.4-cli-alpine AS php-dev
+
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_HOME=/tmp/composer \
+    npm_config_cache=/tmp/npm-cache
+
+RUN apk add --no-cache git icu-libs nodejs npm unzip \
+    && apk add --no-cache --virtual .build-deps icu-dev $PHPIZE_DEPS \
+    && docker-php-ext-install -j"$(nproc)" intl opcache \
+    && apk del .build-deps
+
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+
+WORKDIR /workspace
+
+COPY composer.json composer.lock ./
+RUN --mount=type=cache,target=/tmp/composer/cache \
+    composer install --no-interaction --prefer-dist --no-scripts
+
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/tmp/npm-cache \
+    npm ci --ignore-scripts
+
+COPY . .
+RUN composer dump-autoload --optimize \
+    && npm run build \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+EXPOSE 8000
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+
+FROM php-dev AS quality
+CMD ["sh", "-lc", "vendor/bin/pint --format agent && php artisan test --compact"]
