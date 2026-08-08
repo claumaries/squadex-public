@@ -18,7 +18,7 @@ class BuildPublicPage
     ) {}
 
     /**
-     * @return array{view: string, data: array<string, mixed>}
+     * @return array{view: string, data: array<string, mixed>, status: int, retry_after: int|null}
      */
     public function handle(Request $request, string $page): array
     {
@@ -31,8 +31,10 @@ class BuildPublicPage
         $parameters = $this->projectionParameters($request);
         $projectionMode = $definition['projection'] ?? false;
         $projection = $projectionMode === false ? null : $this->projections->page($page, $parameters);
-        $title = (string) data_get($projection, 'seo.title', __((string) ($request->route('title') ?? $definition['title'])));
-        $description = (string) data_get($projection, 'seo.description', __((string) $definition['description']));
+        $sourceTitle = (string) ($request->route('title') ?? $definition['title']);
+        $sourceDescription = (string) $definition['description'];
+        $title = (string) data_get($projection, 'seo.title', __($sourceTitle));
+        $description = (string) data_get($projection, 'seo.description', __($sourceDescription));
         $data = is_array($projection)
             ? $this->hydrateProjectionData->handle(Arr::except($projection, ['seo']), $request)
             : [];
@@ -42,8 +44,19 @@ class BuildPublicPage
                 'view' => 'v2.pages.public-data-unavailable',
                 'data' => [
                     'title' => $title,
-                    'seo' => $this->seo->make($title, $description),
+                    'seo' => $this->seo->make(
+                        $title,
+                        $description,
+                        availableLocales: [$this->requestLocale($request)],
+                        robots: 'noindex, nofollow',
+                        translationKeys: [
+                            'title' => $sourceTitle,
+                            'description' => $sourceDescription,
+                        ],
+                    ),
                 ],
+                'status' => 503,
+                'retry_after' => 300,
             ];
         }
 
@@ -52,15 +65,37 @@ class BuildPublicPage
             'data' => [
                 ...$this->defaults($page),
                 ...$data,
-                'seo' => $this->seo->make($title, $description),
+                'seo' => $this->seo->make(
+                    $title,
+                    $description,
+                    availableLocales: $this->projectionAvailableLocales($projection, $request, $projectionMode),
+                    robots: $this->projectionRobots($request, $projectionMode),
+                    translationKeys: [
+                        'title' => $sourceTitle,
+                        'description' => $sourceDescription,
+                    ],
+                ),
             ],
+            'status' => 200,
+            'retry_after' => null,
         ];
     }
 
     /** @return array<string, scalar|null> */
     private function projectionParameters(Request $request): array
     {
-        $query = $request->only(['page', 'per_page', 'category', 'country', 'league', 'position', 'q', 'status']);
+        $query = $request->only([
+            'page',
+            'per_page',
+            'category',
+            'country',
+            'league',
+            'position',
+            'q',
+            'sort',
+            'direction',
+            'status',
+        ]);
         $query['page'] = max(1, min((int) ($query['page'] ?? 1), 10000));
         $query['per_page'] = max(1, min((int) ($query['per_page'] ?? 20), 100));
         $query['locale'] = (string) $request->route('locale');
@@ -78,6 +113,56 @@ class BuildPublicPage
             ->all();
 
         return $this->canonicalParameters->normalize($parameters);
+    }
+
+    /** @param  array<string, mixed>|null  $projection */
+    private function projectionAvailableLocales(?array $projection, Request $request, bool|string $projectionMode): ?array
+    {
+        if ($projectionMode !== true) {
+            return null;
+        }
+
+        $availableLocales = data_get($projection, 'seo.available_locales');
+
+        if (! is_array($availableLocales)) {
+            return [$this->requestLocale($request)];
+        }
+
+        return array_values(array_filter($availableLocales, 'is_string'));
+    }
+
+    private function projectionRobots(Request $request, bool|string $projectionMode): string
+    {
+        if ($projectionMode !== true) {
+            return 'index,follow';
+        }
+
+        $parameters = $this->projectionParameters($request);
+        $indexableParameters = [
+            'category',
+            'country',
+            'direction',
+            'league',
+            'position',
+            'q',
+            'sort',
+            'status',
+        ];
+
+        foreach ($indexableParameters as $parameter) {
+            if (($parameters[$parameter] ?? null) !== null && ($parameters[$parameter] ?? '') !== '') {
+                return 'noindex, follow';
+            }
+        }
+
+        return ($parameters['page'] ?? 1) === 1 && ($parameters['per_page'] ?? 20) === 20
+            ? 'index,follow'
+            : 'noindex, follow';
+    }
+
+    private function requestLocale(Request $request): string
+    {
+        return (string) $request->route('locale');
     }
 
     /** @return array<string, mixed> */

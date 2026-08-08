@@ -32,39 +32,46 @@ class SitemapBuilder
             return;
         }
 
-        $routeNames = [
-            'pages.homepage',
-            'pages.about',
-            'pages.contact',
-            'pages.game',
-            'pages.matches',
-            'pages.teams',
-            'pages.players',
-            'pages.news',
-            'pages.marketplace.players',
-            'pages.tournaments',
-            'pages.leaderboards',
-            'pages.community',
-            'pages.token',
-            'pages.tokenomics',
-            'pages.token-roadmap',
-            'pages.token-transparency',
-            'pages.presale',
-            'pages.how-to-buy',
-            'pages.contract',
-            'pages.liquidity',
-            'pages.vesting',
-            'pages.whitepaper',
-            'pages.privacy',
-            'pages.cookie',
-            'pages.terms',
-            'pages.kyc',
-            'pages.disclaimer',
-            'pages.faq',
+        $routes = [
+            ['name' => 'pages.homepage'],
+            ['name' => 'pages.about'],
+            ['name' => 'pages.contact'],
+            ['name' => 'pages.game'],
+            ['name' => 'pages.matches', 'projection' => 'matches'],
+            ['name' => 'pages.teams', 'projection' => 'teams'],
+            ['name' => 'pages.players', 'projection' => 'players'],
+            ['name' => 'pages.marketplace.players', 'projection' => 'marketplace'],
+            ['name' => 'pages.marketplace.clubs', 'projection' => 'marketplace-clubs'],
+            ['name' => 'pages.marketplace.stadiums', 'projection' => 'marketplace-stadiums'],
+            ['name' => 'pages.community'],
+            ['name' => 'pages.token'],
+            ['name' => 'pages.tokenomics'],
+            ['name' => 'pages.token-roadmap'],
+            ['name' => 'pages.token-transparency'],
+            ['name' => 'pages.presale'],
+            ['name' => 'pages.how-to-buy'],
+            ['name' => 'pages.contract'],
+            ['name' => 'pages.liquidity'],
+            ['name' => 'pages.vesting'],
+            ['name' => 'pages.whitepaper'],
+            ['name' => 'pages.privacy'],
+            ['name' => 'pages.cookie'],
+            ['name' => 'pages.terms'],
+            ['name' => 'pages.kyc'],
+            ['name' => 'pages.disclaimer'],
+            ['name' => 'pages.faq'],
         ];
 
         foreach ($this->locales->routeLocales() as $locale) {
-            foreach ($routeNames as $routeName) {
+            foreach ($routes as $route) {
+                $projection = $route['projection'] ?? null;
+
+                if (is_string($projection) && ! $this->projectedPageIsAvailable($projection, $locale)) {
+                    continue;
+                }
+
+                $routeName = $route['name'];
+
                 yield [
                     'url' => route($routeName, ['locale' => $locale]),
                     'change_frequency' => str_starts_with($routeName, 'pages.token') ? 'weekly' : 'daily',
@@ -72,5 +79,14 @@ class SitemapBuilder
                 ];
             }
         }
+    }
+
+    private function projectedPageIsAvailable(string $page, string $locale): bool
+    {
+        return $this->projections->page($page, [
+            'locale' => $locale,
+            'page' => 1,
+            'per_page' => 20,
+        ]) !== null;
     }
 }
