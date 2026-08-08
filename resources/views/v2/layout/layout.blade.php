@@ -8,7 +8,7 @@
         $seoKeywords = $seo['keywords'] ?? null;
         $seoCanonical = $seo['canonical'] ?? request()->fullUrl();
         $seoAlternates = $seo['alternates'] ?? [];
-        $seoImage = $seo['image'] ?? asset('blade/images/logo.png');
+        $seoImage = $seo['image'] ?? asset('v2/assets/squadex-og.png');
         $seoRobots = $seo['robots'] ?? 'index,follow';
         $seoXDefault = $seo['xDefault'] ?? $seoCanonical;
         $seoStructuredData = $seo['structuredData'] ?? [

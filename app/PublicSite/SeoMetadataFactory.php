@@ -3,6 +3,7 @@
 namespace App\PublicSite;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Lang;
 
 class SeoMetadataFactory
 {
@@ -13,9 +14,11 @@ class SeoMetadataFactory
 
     /**
      * @param  array<string, mixed>  $routeParameters
+     * @param  list<string>|null  $availableLocales
+     * @param  array{title: string, description: string}|null  $translationKeys
      * @return array<string, mixed>
      */
-    public function make(string $title, string $description, array $routeParameters = []): array
+    public function make(string $title, string $description, array $routeParameters = [], ?array $availableLocales = null, string $robots = 'index,follow', ?array $translationKeys = null): array
     {
         $route = $this->request->route();
         $routeName = $route?->getName() ?? 'pages.homepage';
@@ -26,7 +29,14 @@ class SeoMetadataFactory
         $currentRouteLocale = $this->locales->routeLocale((string) $this->request->route('locale'));
         $currentMetadata = $this->locales->metadata($currentRouteLocale);
 
-        $alternates = collect($this->locales->routeLocales())->mapWithKeys(function (string $locale) use ($routeName, $parameters): array {
+        $routeLocales = collect($availableLocales ?? $this->translatedRouteLocales(
+            $translationKeys['title'] ?? $title,
+            $translationKeys['description'] ?? $description,
+        ))
+            ->filter(fn (mixed $locale): bool => is_string($locale) && $this->locales->isRouteLocale($locale))
+            ->unique()
+            ->values();
+        $alternates = $routeLocales->mapWithKeys(function (string $locale) use ($routeName, $parameters): array {
             return [$locale => [
                 'hreflang' => (string) data_get($this->locales->metadata($locale), 'hreflang', $locale),
                 'url' => route($routeName, ['locale' => $locale, ...$parameters]),
@@ -34,8 +44,8 @@ class SeoMetadataFactory
         })->all();
 
         $canonical = route($routeName, ['locale' => $currentRouteLocale, ...$parameters]);
-        $image = asset('blade/images/logo.png');
-        $openGraphLocales = collect($this->locales->routeLocales())
+        $image = asset('v2/assets/squadex-og.png');
+        $openGraphLocales = $routeLocales
             ->map(fn (string $locale): string => (string) data_get($this->locales->metadata($locale), 'og_locale', $locale))
             ->values();
 
@@ -47,7 +57,7 @@ class SeoMetadataFactory
             'xDefault' => data_get($alternates, 'en.url', $canonical),
             'htmlLang' => (string) data_get($currentMetadata, 'html_lang', $currentRouteLocale),
             'image' => $image,
-            'robots' => 'index,follow',
+            'robots' => $robots,
             'openGraph' => [
                 'type' => 'website',
                 'title' => $title,
@@ -74,5 +84,23 @@ class SeoMetadataFactory
                 'image' => $image,
             ],
         ];
+    }
+
+    /** @return list<string> */
+    private function translatedRouteLocales(string $title, string $description): array
+    {
+        return collect($this->locales->routeLocales())
+            ->filter(function (string $routeLocale) use ($title, $description): bool {
+                if ($routeLocale === 'en') {
+                    return true;
+                }
+
+                $translationLocale = $this->locales->translationLocale($routeLocale);
+
+                return Lang::hasForLocale($title, $translationLocale, false)
+                    && Lang::hasForLocale($description, $translationLocale, false);
+            })
+            ->values()
+            ->all();
     }
 }
