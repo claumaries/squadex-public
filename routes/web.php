@@ -162,6 +162,18 @@ Route::prefix('{locale}')
             ->where(['competition' => '[A-Za-z0-9-]+', 'year' => '\d{4}', 'slug' => '[A-Za-z0-9-]+'])
             ->defaults('page', 'match-stats')
             ->name('page.match.stats');
+        Route::get('/match/{competition}/{year}/{slug}/lineups', ShowPublicPageController::class)
+            ->where(['competition' => '[A-Za-z0-9-]+', 'year' => '\d{4}', 'slug' => '[A-Za-z0-9-]+'])
+            ->defaults('page', 'match-lineups')
+            ->name('page.match.lineups');
+        Route::get('/match/{competition}/{year}/{slug}/timeline', ShowPublicPageController::class)
+            ->where(['competition' => '[A-Za-z0-9-]+', 'year' => '\d{4}', 'slug' => '[A-Za-z0-9-]+'])
+            ->defaults('page', 'match-timeline')
+            ->name('page.match.timeline');
+        Route::get('/match/{competition}/{year}/{slug}/ratings', ShowPublicPageController::class)
+            ->where(['competition' => '[A-Za-z0-9-]+', 'year' => '\d{4}', 'slug' => '[A-Za-z0-9-]+'])
+            ->defaults('page', 'match-ratings')
+            ->name('page.match.ratings');
         Route::get('/match/{slug}/lineups', ShowPublicPageController::class)->where('slug', '[A-Za-z0-9-]+')->defaults('page', 'match-lineups')->name('pages.match.lineups');
         Route::get('/match/{slug}/stats', ShowPublicPageController::class)->where('slug', '[A-Za-z0-9-]+')->defaults('page', 'match-stats')->name('pages.match.stats.legacy');
         Route::get('/match/{slug}/timeline', ShowPublicPageController::class)->where('slug', '[A-Za-z0-9-]+')->defaults('page', 'match-timeline')->name('pages.match.timeline');

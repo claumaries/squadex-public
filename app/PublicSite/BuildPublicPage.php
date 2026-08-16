@@ -30,7 +30,7 @@ class BuildPublicPage
 
         $parameters = $this->projectionParameters($request);
         $projectionMode = $definition['projection'] ?? false;
-        $projection = $projectionMode === false ? null : $this->projections->page($page, $parameters);
+        $projection = $projectionMode === false ? null : $this->projection($page, $parameters);
         $sourceTitle = (string) ($request->route('title') ?? $definition['title']);
         $sourceDescription = (string) $definition['description'];
         $title = (string) data_get($projection, 'seo.title', __($sourceTitle));
@@ -69,7 +69,7 @@ class BuildPublicPage
                     $title,
                     $description,
                     availableLocales: $this->projectionAvailableLocales($projection, $request, $projectionMode),
-                    robots: $this->projectionRobots($request, $projectionMode),
+                    robots: $this->projectionRobots($request, $projectionMode, $page),
                     translationKeys: [
                         'title' => $sourceTitle,
                         'description' => $sourceDescription,
@@ -115,6 +115,359 @@ class BuildPublicPage
         return $this->canonicalParameters->normalize($parameters);
     }
 
+    /** @param  array<string, scalar|null>  $parameters
+     * @return array<string, mixed>|null
+     */
+    private function projection(string $page, array $parameters): ?array
+    {
+        if ($page === 'club') {
+            return $this->clubProjection($parameters);
+        }
+
+        if ($page === 'match-details') {
+            return $this->matchDetailsProjection($parameters);
+        }
+
+        if (in_array($page, ['match-stats', 'match-lineups', 'match-ratings', 'match-timeline'], true)) {
+            return $this->canonicalMatchProjection($page, $parameters);
+        }
+
+        if (in_array($page, ['league-season', 'competition-season', 'standings'], true)) {
+            return $this->competitionSeasonProjection($page, $parameters);
+        }
+
+        if ($page === 'season') {
+            return $this->seasonProjection($parameters);
+        }
+
+        if ($page === 'country') {
+            return $this->countryProjection($parameters);
+        }
+
+        if ($page === 'city') {
+            return $this->cityProjection($parameters);
+        }
+
+        if ($page === 'player-stats') {
+            return $this->playerStatsProjection($parameters);
+        }
+
+        if ($page !== 'player-details') {
+            return $this->projections->page($page, $parameters);
+        }
+
+        $uuid = $parameters['uuid'] ?? null;
+
+        if (! is_string($uuid) || ! Str::isUuid($uuid)) {
+            return null;
+        }
+
+        $document = $this->projections->page($page, Arr::only($parameters, [
+            'locale',
+            'page',
+            'per_page',
+        ]));
+        $player = data_get($document, "players.{$uuid}");
+
+        if (! is_array($player)) {
+            return null;
+        }
+
+        return [
+            'player' => $player,
+            'seo' => data_get($document, 'seo', []),
+        ];
+    }
+
+    /** @param  array<string, scalar|null>  $parameters
+     * @return array<string, mixed>|null
+     */
+    private function clubProjection(array $parameters): ?array
+    {
+        $country = $parameters['country'] ?? null;
+        $club = $parameters['club'] ?? null;
+
+        if (! is_string($country) || ! is_string($club)) {
+            return null;
+        }
+
+        $document = $this->projections->page('club', Arr::only($parameters, [
+            'locale',
+            'page',
+            'per_page',
+        ]));
+        $projection = data_get($document, "clubs.{$country}/{$club}");
+
+        if (! is_array($projection)) {
+            return null;
+        }
+
+        return [
+            'club' => $projection,
+            'seo' => data_get($document, 'seo', []),
+        ];
+    }
+
+    /** @param  array<string, scalar|null>  $parameters
+     * @return array<string, mixed>|null
+     */
+    private function matchDetailsProjection(array $parameters): ?array
+    {
+        $competition = $parameters['competition'] ?? null;
+        $year = $parameters['year'] ?? null;
+        $slug = $parameters['slug'] ?? null;
+
+        $document = $this->projections->page('match-details', Arr::only($parameters, [
+            'locale',
+            'page',
+            'per_page',
+        ]));
+
+        $matches = data_get($document, 'matches', []);
+        $matchKey = null;
+
+        if (is_string($competition) && is_string($year) && is_string($slug)) {
+            $candidate = "{$competition}/{$year}/{$slug}";
+            if (is_array($matches) && array_key_exists($candidate, $matches)) {
+                $matchKey = $candidate;
+            }
+        }
+
+        if (! is_string($matchKey) && is_string($slug)) {
+            $matchKey = $this->matchCanonicalPathForSlug($slug, is_array($matches) ? $matches : []);
+        }
+
+        if (! is_string($matchKey)) {
+            return null;
+        }
+
+        $projection = data_get($document, "matches.{$matchKey}");
+
+        if (! is_array($projection)) {
+            return null;
+        }
+
+        return [
+            'match' => $projection,
+            'seo' => data_get($document, 'seo', []),
+        ];
+    }
+
+    /** @param  array<string, scalar|null>  $parameters
+     * @return array<string, mixed>|null
+     */
+    private function canonicalMatchProjection(string $page, array $parameters): ?array
+    {
+        $competition = $parameters['competition'] ?? null;
+        $year = $parameters['year'] ?? null;
+        $slug = $parameters['slug'] ?? null;
+
+        if (! is_string($slug)) {
+            return null;
+        }
+
+        $document = $this->projections->page($page, Arr::only($parameters, [
+            'locale',
+            'page',
+            'per_page',
+        ]));
+        $matchEntries = data_get($document, 'matches', []);
+
+        if (! is_array($matchEntries)) {
+            return null;
+        }
+
+        $matchKey = null;
+
+        if (is_string($competition) && is_string($year)) {
+            $matchKey = "{$competition}/{$year}/{$slug}";
+        }
+
+        if (! is_string($matchKey) || ! array_key_exists($matchKey, $matchEntries)) {
+            $matchKey = $this->matchCanonicalPathForSlug($slug, $matchEntries);
+
+            if ($matchKey !== null && ! array_key_exists($matchKey, $matchEntries)) {
+                $matchKey = null;
+            }
+        }
+
+        if ($matchKey === null) {
+            return null;
+        }
+
+        $projection = data_get($document, "matches.{$matchKey}");
+
+        if (! is_array($projection)) {
+            return null;
+        }
+
+        return [
+            ...$projection,
+            'seo' => data_get($document, 'seo', []),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $matches
+     */
+    private function matchCanonicalPathForSlug(string $slug, array $matches): ?string
+    {
+        foreach (array_keys($matches) as $matchKey) {
+            if (! is_string($matchKey)) {
+                continue;
+            }
+
+            if ($matchKey === $slug || str_ends_with($matchKey, "/{$slug}")) {
+                return $matchKey;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param  array<string, scalar|null>  $parameters
+     * @return array<string, mixed>|null
+     */
+    private function competitionSeasonProjection(string $page, array $parameters): ?array
+    {
+        $slug = $parameters['slug'] ?? $parameters['league'] ?? null;
+
+        if (! is_string($slug)) {
+            return null;
+        }
+
+        $document = $this->projections->page($page, Arr::only($parameters, [
+            'locale',
+            'page',
+            'per_page',
+        ]));
+        $path = $page === 'competition-season'
+            ? "competitions.{$slug}"
+            : "leagues.{$slug}";
+        $projection = data_get($document, $path);
+
+        if (! is_array($projection)) {
+            return null;
+        }
+
+        return [
+            ...$projection,
+            'seo' => data_get($document, 'seo', []),
+        ];
+    }
+
+    /** @param  array<string, scalar|null>  $parameters
+     * @return array<string, mixed>|null
+     */
+    private function seasonProjection(array $parameters): ?array
+    {
+        $year = $parameters['year'] ?? null;
+
+        if (! is_string($year) || ! ctype_digit($year)) {
+            return null;
+        }
+
+        $document = $this->projections->page('season', Arr::only($parameters, [
+            'locale',
+            'page',
+            'per_page',
+        ]));
+        $projection = data_get($document, "seasons.{$year}");
+
+        if (! is_array($projection)) {
+            return null;
+        }
+
+        return [
+            ...$projection,
+            'seo' => data_get($document, 'seo', []),
+        ];
+    }
+
+    /** @param  array<string, scalar|null>  $parameters
+     * @return array<string, mixed>|null
+     */
+    private function countryProjection(array $parameters): ?array
+    {
+        $slug = $parameters['slug'] ?? null;
+
+        if (! is_string($slug)) {
+            return null;
+        }
+
+        $document = $this->projections->page('country', Arr::only($parameters, [
+            'locale',
+            'page',
+            'per_page',
+        ]));
+        $projection = data_get($document, "countries.{$slug}");
+
+        if (! is_array($projection)) {
+            return null;
+        }
+
+        return [
+            ...$projection,
+            'seo' => data_get($document, 'seo', []),
+        ];
+    }
+
+    /** @param  array<string, scalar|null>  $parameters
+     * @return array<string, mixed>|null
+     */
+    private function cityProjection(array $parameters): ?array
+    {
+        $slug = $parameters['slug'] ?? null;
+
+        if (! is_string($slug)) {
+            return null;
+        }
+
+        $document = $this->projections->page('city', Arr::only($parameters, [
+            'locale',
+            'page',
+            'per_page',
+        ]));
+        $projection = data_get($document, "cities.{$slug}");
+
+        if (! is_array($projection)) {
+            return null;
+        }
+
+        return [
+            ...$projection,
+            'seo' => data_get($document, 'seo', []),
+        ];
+    }
+
+    /** @param  array<string, scalar|null>  $parameters
+     * @return array<string, mixed>|null
+     */
+    private function playerStatsProjection(array $parameters): ?array
+    {
+        $uuid = $parameters['slug'] ?? null;
+
+        if (! is_string($uuid) || ! Str::isUuid($uuid)) {
+            return null;
+        }
+
+        $document = $this->projections->page('player-stats', Arr::only($parameters, [
+            'locale',
+            'page',
+            'per_page',
+        ]));
+        $projection = data_get($document, "players.{$uuid}");
+
+        if (! is_array($projection)) {
+            return null;
+        }
+
+        return [
+            ...$projection,
+            'seo' => data_get($document, 'seo', []),
+        ];
+    }
+
     /** @param  array<string, mixed>|null  $projection */
     private function projectionAvailableLocales(?array $projection, Request $request, bool|string $projectionMode): ?array
     {
@@ -131,13 +484,16 @@ class BuildPublicPage
         return array_values(array_filter($availableLocales, 'is_string'));
     }
 
-    private function projectionRobots(Request $request, bool|string $projectionMode): string
+    private function projectionRobots(Request $request, bool|string $projectionMode, string $page): string
     {
         if ($projectionMode !== true) {
             return 'index,follow';
         }
 
-        $parameters = $this->projectionParameters($request);
+        if ($page === 'club') {
+            return 'index,follow';
+        }
+
         $indexableParameters = [
             'category',
             'country',
@@ -150,10 +506,14 @@ class BuildPublicPage
         ];
 
         foreach ($indexableParameters as $parameter) {
-            if (($parameters[$parameter] ?? null) !== null && ($parameters[$parameter] ?? '') !== '') {
+            $value = $request->query($parameter);
+
+            if ($value !== null && $value !== '') {
                 return 'noindex, follow';
             }
         }
+
+        $parameters = $this->projectionParameters($request);
 
         return ($parameters['page'] ?? 1) === 1 && ($parameters['per_page'] ?? 20) === 20
             ? 'index,follow'

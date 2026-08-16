@@ -17,6 +17,10 @@ class HydrateProjectionData
 
     private function hydrate(mixed $value, Request $request): mixed
     {
+        if (is_string($value)) {
+            return str_replace('{locale}', (string) $request->route('locale'), $value);
+        }
+
         if (! is_array($value)) {
             return $value;
         }

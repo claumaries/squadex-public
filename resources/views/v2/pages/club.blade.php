@@ -6,6 +6,7 @@
         $clubLogo = \Illuminate\Support\Arr::get($club, 'logoUrl');
         $stadiumName = \Illuminate\Support\Arr::get($club, 'stadium.name');
         $stadiumImage = \Illuminate\Support\Arr::get($club, 'stadium.imageUrl');
+        $hasStadium = is_string($stadiumName) && $stadiumName !== '';
         $players = collect(\Illuminate\Support\Arr::get($club, 'players', []));
         $compareOptions = collect(\Illuminate\Support\Arr::get($club, 'compareOptions', []));
         $squadMarketValue = $players->sum(fn (array $player): int => (int) \Illuminate\Support\Arr::get($player, 'market_value', 0));
@@ -91,10 +92,12 @@
         <section class="club-detail-section">
             <div class="container club-detail-layout">
                 <article class="club-detail-main">
-                    <header class="club-detail-section-head">
-                        <span>{{ trans('custom.stadium') }}</span>
-                        <h2>{{ $stadiumName }}</h2>
-                    </header>
+                    @if($hasStadium)
+                        <header class="club-detail-section-head">
+                            <span>{{ trans('custom.stadium') }}</span>
+                            <h2>{{ $stadiumName }}</h2>
+                        </header>
+                    @endif
 
                     <dl class="club-detail-facts">
                         @if($location !== '')
@@ -151,15 +154,21 @@
                     @forelse($players as $player)
                         <article class="club-player-row">
                             <a class="club-player-identity" href="{{ public_route('pages.player.details', ['uuid' => \Illuminate\Support\Arr::get($player, 'uuid')]) }}">
-                                <img src="{{ \Illuminate\Support\Arr::get($player, 'imageUrl') }}" alt="{{ \Illuminate\Support\Arr::get($player, 'name') }}" loading="lazy">
+                                @if(\Illuminate\Support\Arr::get($player, 'imageUrl'))
+                                    <img src="{{ \Illuminate\Support\Arr::get($player, 'imageUrl') }}" alt="{{ \Illuminate\Support\Arr::get($player, 'name') }}" loading="lazy">
+                                @endif
                                 <strong>{{ \Illuminate\Support\Arr::get($player, 'name') }}</strong>
                             </a>
 
                             <span>{{ \Illuminate\Support\Arr::get($player, 'player_position.short_name') }}</span>
                             <span>{{ \Illuminate\Support\Arr::get($player, 'age') }} {{ trans('custom.yo') }}</span>
                             <span class="club-player-value">{{ number_format((int) \Illuminate\Support\Arr::get($player, 'market_value', 0)) }}</span>
-                            <span>{{ \Illuminate\Support\Arr::get($player, 'formattedHeight') }} / {{ \Illuminate\Support\Arr::get($player, 'formattedWeight') }}</span>
-                            <span>{{ \Illuminate\Support\Arr::get($player, 'city.name') }}, {{ \Illuminate\Support\Arr::get($player, 'country.name') }}</span>
+                            @if(\Illuminate\Support\Arr::get($player, 'formattedHeight') || \Illuminate\Support\Arr::get($player, 'formattedWeight'))
+                                <span>{{ \Illuminate\Support\Arr::get($player, 'formattedHeight') }} / {{ \Illuminate\Support\Arr::get($player, 'formattedWeight') }}</span>
+                            @endif
+                            @if(\Illuminate\Support\Arr::get($player, 'city.name') || \Illuminate\Support\Arr::get($player, 'country.name'))
+                                <span>{{ \Illuminate\Support\Arr::get($player, 'city.name') }}, {{ \Illuminate\Support\Arr::get($player, 'country.name') }}</span>
+                            @endif
                         </article>
                     @empty
                         <p class="club-detail-empty">{{ trans('admin.no_results') }}</p>
