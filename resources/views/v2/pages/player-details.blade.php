@@ -108,18 +108,29 @@
                                 <dd>{{ $birthPlace }}</dd>
                             </div>
                         @endif
-                        <div>
-                            <dt>{{ trans('custom.date_of_birth') }}</dt>
-                            <dd>{{ $dateOfBirth }} ({{ \Illuminate\Support\Arr::get($player, 'age') }} {{ trans('custom.yo') }})</dd>
-                        </div>
-                        <div>
-                            <dt>{{ trans('custom.height') }}</dt>
-                            <dd>{{ \Illuminate\Support\Arr::get($player, 'formattedHeight') }}</dd>
-                        </div>
-                        <div>
-                            <dt>{{ trans('custom.weight') }}</dt>
-                            <dd>{{ \Illuminate\Support\Arr::get($player, 'formattedWeight') }}</dd>
-                        </div>
+                        @if($dateOfBirth || \Illuminate\Support\Arr::get($player, 'age') !== null)
+                            <div>
+                                <dt>{{ trans('custom.date_of_birth') }}</dt>
+                                <dd>
+                                    {{ $dateOfBirth }}
+                                    @if(\Illuminate\Support\Arr::get($player, 'age') !== null)
+                                        ({{ \Illuminate\Support\Arr::get($player, 'age') }} {{ trans('custom.yo') }})
+                                    @endif
+                                </dd>
+                            </div>
+                        @endif
+                        @if(\Illuminate\Support\Arr::get($player, 'formattedHeight'))
+                            <div>
+                                <dt>{{ trans('custom.height') }}</dt>
+                                <dd>{{ \Illuminate\Support\Arr::get($player, 'formattedHeight') }}</dd>
+                            </div>
+                        @endif
+                        @if(\Illuminate\Support\Arr::get($player, 'formattedWeight'))
+                            <div>
+                                <dt>{{ trans('custom.weight') }}</dt>
+                                <dd>{{ \Illuminate\Support\Arr::get($player, 'formattedWeight') }}</dd>
+                            </div>
+                        @endif
                         <div>
                             <dt>{{ trans('custom.market_value') }}</dt>
                             <dd>{{ $marketValue }}</dd>

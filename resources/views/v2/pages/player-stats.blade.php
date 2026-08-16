@@ -103,7 +103,9 @@
                                 <span>{{ __('admin.player_profile') }}</span>
                                 <nav class="token-roadmap-intro-actions" aria-label="{{ __('admin.player_profile') }}">
                                     <a href="{{ $player['profileUrl'] }}">{{ __('admin.view_details') }}</a>
-                                    <a href="{{ $player['matchesUrl'] }}">{{ __('admin.matches_played') }}</a>
+                                    @if($player['matchesUrl'])
+                                        <a href="{{ $player['matchesUrl'] }}">{{ __('admin.matches_played') }}</a>
+                                    @endif
                                 </nav>
                             </div>
                         </aside>

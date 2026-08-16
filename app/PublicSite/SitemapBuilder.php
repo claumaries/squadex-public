@@ -6,6 +6,22 @@ use App\Contracts\PublicProjectionRepository;
 
 class SitemapBuilder
 {
+    /** @var array<string, string> */
+    private const DYNAMIC_SECTION_PROJECTIONS = [
+        'blogs' => 'blog-details',
+        'cities' => 'city',
+        'clubs' => 'club',
+        'competition-seasons' => 'competition-season',
+        'countries' => 'country',
+        'league-seasons' => 'league-season',
+        'matches' => 'match-details',
+        'news' => 'news-details',
+        'players' => 'player-details',
+        'seasons' => 'season',
+        'standings' => 'standings',
+        'team-forms' => 'team-form',
+    ];
+
     public function __construct(
         private readonly LocaleRegistry $locales,
         private readonly PublicProjectionRepository $projections,
@@ -27,6 +43,12 @@ class SitemapBuilder
     public function section(string $section): iterable
     {
         if ($section !== 'static') {
+            $projection = self::DYNAMIC_SECTION_PROJECTIONS[$section] ?? null;
+
+            if ($projection !== null && ! $this->projectedPageIsAvailable($projection, 'en')) {
+                return;
+            }
+
             yield from $this->projections->sitemap($section);
 
             return;

@@ -22,7 +22,7 @@
             $homeClub['countryName'] ?? null,
         ]);
         $venueParts = array_filter([
-            $homeClub['stadium']['name'] ?? null,
+            $match['stadium']['name'] ?? $homeClub['stadium']['name'] ?? null,
             $locationParts !== [] ? implode(', ', $locationParts) : null,
         ]);
         $venueSummary = implode(', ', $venueParts);
@@ -35,8 +35,8 @@
         $homeLineup = $match['home_club_first_11'] ?? [];
         $awayLineup = $match['away_club_first_11'] ?? [];
         $events = $match['details'] ?? [];
-        $homeClubUrl = public_route('page.club.details', club_route_parameters($homeClub));
-        $awayClubUrl = public_route('page.club.details', club_route_parameters($awayClub));
+        $homeClubUrl = $homeClub['url'] ?? null;
+        $awayClubUrl = $awayClub['url'] ?? null;
         $statsUrl = public_route('page.match.stats', [
             'competition' => request()->route('competition'),
             'year' => request()->route('year'),
@@ -74,9 +74,13 @@
                     <section class="match-team-card">
                         <img src="{{ $homeLogo }}" alt="{{ $homeName }}">
                         <h2>
-                            <a href="{{ $homeClubUrl }}">
+                            @if($homeClubUrl)
+                                <a href="{{ $homeClubUrl }}">
+                                    {{ $homeName }}
+                                </a>
+                            @else
                                 {{ $homeName }}
-                            </a>
+                            @endif
                         </h2>
                         @if($homeGoals !== [])
                             <ul>
@@ -96,15 +100,21 @@
                         @if($venueSummary !== '')
                             <div class="match-score-venue">{{ $venueSummary }}</div>
                         @endif
-                        <a class="match-score-stats-link" href="{{ $statsUrl }}">{{ __('Match Statistics') }}</a>
+                        @if($match['statsUrl'] ?? null)
+                            <a class="match-score-stats-link" href="{{ $statsUrl }}">{{ __('Match Statistics') }}</a>
+                        @endif
                     </section>
 
                     <section class="match-team-card away">
                         <img src="{{ $awayLogo }}" alt="{{ $awayName }}">
                         <h2>
-                            <a href="{{ $awayClubUrl }}">
+                            @if($awayClubUrl)
+                                <a href="{{ $awayClubUrl }}">
+                                    {{ $awayName }}
+                                </a>
+                            @else
                                 {{ $awayName }}
-                            </a>
+                            @endif
                         </h2>
                         @if($awayGoals !== [])
                             <ul>
